@@ -1,0 +1,12 @@
+=== 调度自动化测试 ===
+FCFS: makespan=14 (expected >= 14)
+SJF : makespan=14
+RR  : makespan=14
+PRI : makespan=14
+
+所有调度测试通过
+
+=== 内存自动化测试 ===
+FIFO faults=15  LRU faults=12  OPT faults=9
+
+所有内存测试通过
