@@ -1,7 +1,4 @@
 # 操作系统课程设计 — 综合演示系统
-
-> 班级:2026 计算机科学与技术 1 班
-> 课程:《操作系统》课程设计
 > 平台:Linux (Ubuntu 22.04, GCC 11+)
 > 语言:C11 + POSIX Threads
 
@@ -145,9 +142,6 @@ FIFO faults=15  LRU faults=12  OPT faults=9
 
 详细脚本见 `tests/run_fs_demo.sh`。
 
-## 七、提交说明
-
-按课程要求,本项目已托管至 GitHub。报告位于 `docs/report.md`,可导出为 PDF 提交。
 
 ## License
 
