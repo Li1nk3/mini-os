@@ -252,7 +252,7 @@ static int dir_remove_entry(uint32_t dir_ino, const char *name) {
 }
 
 static int dir_lookup(uint32_t dir_ino, const char *name, uint32_t *out) {
-    DirEntry entries[FS_MAX_DENTRY * 4];
+    DirEntry entries[FS_MAX_DENTRY];
     int cnt = 0;
     dir_read(dir_ino, entries, &cnt);
     for (int i = 0; i < cnt; i++) {
@@ -266,7 +266,7 @@ static int dir_lookup(uint32_t dir_ino, const char *name, uint32_t *out) {
 
 /* ----- 命令实现 ----- */
 static void cmd_ls(void) {
-    DirEntry entries[FS_MAX_DENTRY * 4];
+    DirEntry entries[FS_MAX_DENTRY];
     int cnt = 0;
     dir_read(g_cwd, entries, &cnt);
     printf("%-6s %-10s %-10s %s\n", "INODE", "TYPE", "SIZE", "NAME");
@@ -381,7 +381,7 @@ static void cmd_rm(const char *name) {
     }
     Inode *n = &g_inodes[ino];
     if (n->type == FS_T_DIR) {
-        DirEntry entries[FS_MAX_DENTRY * 4];
+        DirEntry entries[FS_MAX_DENTRY];
         int cnt = 0;
         dir_read(ino, entries, &cnt);
         if (cnt > 0) { printf(COLOR_RED "目录非空\n" COLOR_RESET); return; }

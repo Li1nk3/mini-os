@@ -7,7 +7,7 @@
 #define FS_TOTAL_BLOCKS 1024
 #define FS_MAX_INODES   128
 #define FS_MAX_NAME     28
-#define FS_MAX_DENTRY   32
+#define FS_MAX_DENTRY   128  /* 8块 × 16条/块 */
 #define FS_DIRECT_BLOCKS 8
 
 #define FS_T_FILE 1
