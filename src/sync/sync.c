@@ -23,7 +23,8 @@ typedef struct {
     int items_per_producer;
     int total_to_consume;  /* 消费者需要消费的总数 */
     int produced;
-    int consumed;
+    int reserved;          /* 已被某个消费者认领待消费的额度,用于退出判定 */
+    int consumed;          /* 实际完成的消费次数 */
     pthread_mutex_t stat_mu;
     int delay_ms;
 } PCContext;
@@ -66,11 +67,11 @@ static void *consumer_fn(void *arg) {
     PCContext *c = t->ctx;
     for (;;) {
         pthread_mutex_lock(&c->stat_mu);
-        if (c->consumed >= c->total_to_consume) {
+        if (c->reserved >= c->total_to_consume) {
             pthread_mutex_unlock(&c->stat_mu);
             break;
         }
-        c->consumed++;
+        c->reserved++;
         pthread_mutex_unlock(&c->stat_mu);
 
         sem_wait(&c->full);
@@ -80,6 +81,10 @@ static void *consumer_fn(void *arg) {
         c->out = (c->out + 1) % c->buf_size;
         pthread_mutex_unlock(&c->mu);
         sem_post(&c->empty);
+
+        pthread_mutex_lock(&c->stat_mu);
+        c->consumed++;
+        pthread_mutex_unlock(&c->stat_mu);
 
         msleep(c->delay_ms);
     }
@@ -122,7 +127,7 @@ void run_producer_consumer(int producers, int consumers, int buf_size, int items
     pthread_mutex_destroy(&c.mu);
     pthread_mutex_destroy(&c.stat_mu);
 
-    printf("\n生产 %d 项,消费 %d 项,完成\n", c.produced, c.total_to_consume);
+    printf("\n生产 %d 项,消费 %d 项,完成\n", c.produced, c.consumed);
 }
 
 /* ====================== 读者-写者 ====================== */
