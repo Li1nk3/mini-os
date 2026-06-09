@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <assert.h>
 #include "scheduling.h"
 #include "../common/util.h"
 
@@ -89,7 +90,12 @@ void run_sjf(Process *p, int n, GanttChart *g) {
 
 /* ---------------- 时间片轮转 RR ---------------- */
 void run_rr(Process *p, int n, int quantum, GanttChart *g) {
-    int queue[MAX_PROCESSES * 64];
+    if (quantum < 1) quantum = 1;
+    int total_burst = 0;
+    for (int i = 0; i < n; i++) total_burst += p[i].burst;
+    int qsize = total_burst / quantum + n + 1;
+    int *queue = malloc(qsize * sizeof(int));
+    if (!queue) return;
     int head = 0, tail = 0;
     int in_queue[MAX_PROCESSES] = {0};
     int finished = 0;
@@ -149,6 +155,7 @@ void run_rr(Process *p, int n, int quantum, GanttChart *g) {
             queue[tail++] = idx;  /* 重新入队 */
         }
     }
+    free(queue);
     compute_metrics(p, n);
 }
 
@@ -235,7 +242,7 @@ void print_metrics(const Process *p, int n) {
     print_divider();
     double sum_tat = 0, sum_wait = 0, sum_resp = 0, sum_wtat = 0;
     for (int i = 0; i < n; i++) {
-        double wtat = (double)p[i].turnaround / p[i].burst;
+        double wtat = p[i].burst > 0 ? (double)p[i].turnaround / p[i].burst : 0.0;
         printf("%-6d %-10d %-10d %-10d %-12d %-12d %-12d %-12.2f\n",
                p[i].pid, p[i].arrival, p[i].burst, p[i].finish,
                p[i].turnaround, p[i].waiting, p[i].response, wtat);
@@ -261,6 +268,10 @@ static int input_processes(Process *p, int need_priority) {
         p[i].pid = read_int_default("  PID", i + 1);
         p[i].arrival = read_int("  到达时间: ");
         p[i].burst = read_int("  服务时间(CPU): ");
+        while (p[i].burst < 1) {
+            printf(COLOR_RED "  服务时间必须 >= 1\n" COLOR_RESET);
+            p[i].burst = read_int("  服务时间(CPU): ");
+        }
         if (need_priority)
             p[i].priority = read_int("  优先级(数值越小越高): ");
         else

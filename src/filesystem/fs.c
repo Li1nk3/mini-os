@@ -449,6 +449,57 @@ static void cmd_bitmap(void) {
     printf("\n");
 }
 
+/* ----- 自动化测试 (非交互) ----- */
+int filesystem_selftest(void) {
+    const char *img = "/tmp/_fs_selftest.img";
+    int pass = 1;
+
+    if (fs_format(img) != 0) { printf("FAIL: format\n"); return -1; }
+
+    cmd_create("hello.txt");
+    uint32_t ino;
+    if (dir_lookup(g_cwd, "hello.txt", &ino) != 0) {
+        printf("FAIL: create\n"); pass = 0;
+    }
+
+    cmd_write("hello.txt", "hello world");
+    if (pass && g_inodes[ino].size != 11) {
+        printf("FAIL: write size expected 11 got %u\n", g_inodes[ino].size); pass = 0;
+    }
+
+    cmd_mkdir("subdir");
+    uint32_t dino;
+    if (dir_lookup(g_cwd, "subdir", &dino) != 0) {
+        printf("FAIL: mkdir\n"); pass = 0;
+    }
+
+    /* 持久化后重新挂载,验证数据仍存在 */
+    if (g_disk) { fclose(g_disk); g_disk = NULL; }
+    if (fs_mount(img) != 0) { printf("FAIL: remount\n"); pass = 0; }
+    if (pass && dir_lookup(g_cwd, "hello.txt", &ino) != 0) {
+        printf("FAIL: file missing after remount\n"); pass = 0;
+    }
+    if (pass && dir_lookup(g_cwd, "subdir", &dino) != 0) {
+        printf("FAIL: dir missing after remount\n"); pass = 0;
+    }
+
+    cmd_rm("hello.txt");
+    if (dir_lookup(g_cwd, "hello.txt", &ino) == 0) {
+        printf("FAIL: file still exists after rm\n"); pass = 0;
+    }
+
+    cmd_rm("subdir");
+    if (dir_lookup(g_cwd, "subdir", &dino) == 0) {
+        printf("FAIL: dir still exists after rm\n"); pass = 0;
+    }
+
+    if (g_disk) { fclose(g_disk); g_disk = NULL; }
+    remove(img);
+
+    if (pass) printf("文件系统自检通过\n");
+    return pass ? 0 : -1;
+}
+
 /* ----- 菜单 ----- */
 void filesystem_menu(void) {
     char img[256] = DEFAULT_IMG;

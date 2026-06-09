@@ -40,5 +40,6 @@ typedef struct {
 } DirEntry;
 
 void filesystem_menu(void);
+int  filesystem_selftest(void);  /* 非交互自动化测试,成功返回0 */
 
 #endif
