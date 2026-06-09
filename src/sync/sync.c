@@ -324,6 +324,118 @@ void run_dining_philosophers(int n, int rounds, int delay_ms, int strategy) {
         printf("  哲学家%d 进餐 %d 次\n", i, c.ate[i]);
 }
 
+/* ====================== 自动化自检 ====================== */
+int sync_selftest(void) {
+    int pass = 1;
+
+    /* --- 生产者-消费者: consumed 必须等于 produced --- */
+    {
+        PCContext c;
+        memset(&c, 0, sizeof(c));
+        int producers = 3, consumers = 2;
+        c.buf_size = 4;
+        c.items_per_producer = 5;
+        c.total_to_consume = producers * c.items_per_producer;
+        c.delay_ms = 0;
+        sem_init(&c.empty, 0, c.buf_size);
+        sem_init(&c.full, 0, 0);
+        pthread_mutex_init(&c.mu, NULL);
+        pthread_mutex_init(&c.stat_mu, NULL);
+
+        pthread_t ptid[64], ctid[64];
+        ThreadArg pargs[64], cargs[64];
+        for (int i = 0; i < producers; i++) {
+            pargs[i].ctx = &c; pargs[i].id = i + 1;
+            pthread_create(&ptid[i], NULL, producer_fn, &pargs[i]);
+        }
+        for (int i = 0; i < consumers; i++) {
+            cargs[i].ctx = &c; cargs[i].id = i + 1;
+            pthread_create(&ctid[i], NULL, consumer_fn, &cargs[i]);
+        }
+        for (int i = 0; i < producers; i++) pthread_join(ptid[i], NULL);
+        for (int i = 0; i < consumers; i++) pthread_join(ctid[i], NULL);
+        sem_destroy(&c.empty); sem_destroy(&c.full);
+        pthread_mutex_destroy(&c.mu); pthread_mutex_destroy(&c.stat_mu);
+
+        if (c.consumed != c.total_to_consume || c.produced != c.total_to_consume) {
+            printf("FAIL PC: produced=%d consumed=%d expected=%d\n",
+                   c.produced, c.consumed, c.total_to_consume);
+            pass = 0;
+        } else {
+            printf("PASS PC: produced=%d consumed=%d\n", c.produced, c.consumed);
+        }
+    }
+
+    /* --- 读者-写者: 写者优先, data 必须等于 writers*ops --- */
+    {
+        int writers = 3, readers = 4, ops = 4;
+        RWContext c;
+        memset(&c, 0, sizeof(c));
+        pthread_mutex_init(&c.rc_mu, NULL);
+        pthread_mutex_init(&c.wc_mu, NULL);
+        pthread_mutex_init(&c.rw_mu, NULL);
+        pthread_mutex_init(&c.r_try, NULL);
+        c.ops = ops; c.delay_ms = 0; c.priority = 1;
+
+        pthread_t rtid[64], wtid[64];
+        RWArg rargs[64], wargs[64];
+        for (int i = 0; i < readers; i++) {
+            rargs[i].ctx = &c; rargs[i].id = i + 1; rargs[i].is_writer = 0;
+            pthread_create(&rtid[i], NULL, rw_thread, &rargs[i]);
+        }
+        for (int i = 0; i < writers; i++) {
+            wargs[i].ctx = &c; wargs[i].id = i + 1; wargs[i].is_writer = 1;
+            pthread_create(&wtid[i], NULL, rw_thread, &wargs[i]);
+        }
+        for (int i = 0; i < readers; i++) pthread_join(rtid[i], NULL);
+        for (int i = 0; i < writers; i++) pthread_join(wtid[i], NULL);
+        pthread_mutex_destroy(&c.rc_mu); pthread_mutex_destroy(&c.wc_mu);
+        pthread_mutex_destroy(&c.rw_mu); pthread_mutex_destroy(&c.r_try);
+
+        int expected = writers * ops;
+        if (c.data != expected) {
+            printf("FAIL RW: data=%d expected=%d\n", c.data, expected);
+            pass = 0;
+        } else {
+            printf("PASS RW: data=%d\n", c.data);
+        }
+    }
+
+    /* --- 哲学家: 每人进餐次数必须等于 rounds --- */
+    {
+        int n = 5, rounds = 3;
+        DPContext c;
+        memset(&c, 0, sizeof(c));
+        c.n = n; c.rounds = rounds; c.delay_ms = 0; c.strategy = 0;
+        for (int i = 0; i < n; i++) pthread_mutex_init(&c.fork[i], NULL);
+        pthread_mutex_init(&c.stat_mu, NULL);
+
+        pthread_t tid[MAX_PHIL];
+        DPArg args[MAX_PHIL];
+        for (int i = 0; i < n; i++) {
+            args[i].ctx = &c; args[i].id = i;
+            pthread_create(&tid[i], NULL, philosopher, &args[i]);
+        }
+        for (int i = 0; i < n; i++) pthread_join(tid[i], NULL);
+        for (int i = 0; i < n; i++) pthread_mutex_destroy(&c.fork[i]);
+        pthread_mutex_destroy(&c.stat_mu);
+
+        int dp_pass = 1;
+        for (int i = 0; i < n; i++)
+            if (c.ate[i] != rounds) { dp_pass = 0; break; }
+        if (!dp_pass) {
+            printf("FAIL DP: not all philosophers ate %d rounds\n", rounds);
+            for (int i = 0; i < n; i++)
+                printf("  哲学家%d ate=%d\n", i, c.ate[i]);
+            pass = 0;
+        } else {
+            printf("PASS DP: all %d philosophers ate %d rounds\n", n, rounds);
+        }
+    }
+
+    return pass ? 0 : -1;
+}
+
 /* ====================== 菜单 ====================== */
 void sync_menu(void) {
     for (;;) {
